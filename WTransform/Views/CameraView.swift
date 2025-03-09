@@ -24,6 +24,21 @@ struct CameraView: View {
                 
                 // Controls overlay
                 VStack {
+                    // Add a status indicator at the top
+                    HStack {
+                        Circle()
+                            .fill(cameraService.isSessionRunning ? Color.green : Color.red)
+                            .frame(width: 10, height: 10)
+                        
+                        Text(cameraService.isSessionRunning ? "Camera active" : "Camera inactive")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 40)
+                    
                     Spacer()
                     
                     HStack {
@@ -52,23 +67,15 @@ struct CameraView: View {
                         
                         // Capture button
                         Button(action: {
-                            cameraService.capturePhoto { image in
-                                if let image = image {
-                                    photoManager.saveImage(image)
-                                    lastImageTaken = image
-                                    
-                                    // Show capture animation
-                                    withAnimation {
-                                        showingCaptureAnimation = true
-                                    }
-                                    
-                                    // Hide animation after a delay
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                        withAnimation {
-                                            showingCaptureAnimation = false
-                                        }
-                                    }
+                            // Force start session if not running
+                            if !cameraService.isSessionRunning {
+                                cameraService.startSession()
+                                // Add a small delay before capture
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    capturePhoto()
                                 }
+                            } else {
+                                capturePhoto()
                             }
                         }) {
                             Circle()
@@ -171,6 +178,27 @@ struct CameraView: View {
         }
     }
     
+    func capturePhoto() {
+        cameraService.capturePhoto { image in
+            if let image = image {
+                photoManager.saveImage(image)
+                lastImageTaken = image
+                
+                // Show capture animation
+                withAnimation {
+                    showingCaptureAnimation = true
+                }
+                
+                // Hide animation after a delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation {
+                        showingCaptureAnimation = false
+                    }
+                }
+            }
+        }
+    }
+    
     func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -184,23 +212,24 @@ struct CameraPreview: UIViewRepresentable {
     
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: UIScreen.main.bounds)
-        // Set background color to black to prevent white screen
         view.backgroundColor = .black
+        
+        // Add the preview layer immediately
+        cameraService.preview.frame = view.bounds
+        cameraService.preview.videoGravity = .resizeAspectFill
+        view.layer.addSublayer(cameraService.preview)
+        
         return view
     }
     
     func updateUIView(_ uiView: UIView, context: Context) {
-        if cameraService.isCameraReady {
-            if cameraService.preview.superlayer == nil {
-                // Only set up the preview layer once
-                cameraService.preview.frame = uiView.bounds
-                cameraService.preview.videoGravity = .resizeAspectFill
-                
-                // Run on main thread to ensure proper UI updates
-                DispatchQueue.main.async {
-                    uiView.layer.addSublayer(cameraService.preview)
-                    cameraService.startSession()
-                }
+        // Update the preview layer frame if needed
+        DispatchQueue.main.async {
+            cameraService.preview.frame = uiView.bounds
+            
+            // Ensure the session is started
+            if cameraService.isCameraReady && !cameraService.isSessionRunning {
+                cameraService.startSession()
             }
         }
     }
