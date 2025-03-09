@@ -35,6 +35,29 @@ struct ContentView: View {
         }
         .onAppear {
             photoService.requestPermissions()
+            
+            // Customize tab bar appearance to make inactive tabs more visible
+            let appearance = UITabBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = UIColor.systemBackground
+            
+            // Customize the unselected item
+            let normalAttributes: [NSAttributedString.Key: Any] = [
+                .foregroundColor: UIColor.gray
+            ]
+            appearance.stackedLayoutAppearance.normal.titleTextAttributes = normalAttributes
+            appearance.stackedLayoutAppearance.normal.iconColor = UIColor.gray
+            
+            // Customize the selected item
+            let selectedAttributes: [NSAttributedString.Key: Any] = [
+                .foregroundColor: UIColor.systemBlue
+            ]
+            appearance.stackedLayoutAppearance.selected.titleTextAttributes = selectedAttributes
+            appearance.stackedLayoutAppearance.selected.iconColor = UIColor.systemBlue
+            
+            // Apply the appearance settings
+            UITabBar.appearance().standardAppearance = appearance
+            UITabBar.appearance().scrollEdgeAppearance = appearance
         }
     }
 }

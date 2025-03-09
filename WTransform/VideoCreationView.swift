@@ -20,17 +20,49 @@ struct VideoCreationView: View {
     @State private var startDate = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
     @State private var endDate = Date()
     @State private var showingDatePicker = false
+    @State private var videoTitle = ""
+    @State private var enableTransition = true
+    @State private var transitionStyle: TransitionStyle = .crossFade
+    @State private var includeDate = true
+    @State private var videoSpeed: VideoSpeed = .normal
     
     enum DateRangeOption: String, CaseIterable, Identifiable {
-        case lastWeek = "Last Week"
-        case lastMonth = "Last Month"
-        case last3Months = "Last 3 Months"
-        case last6Months = "Last 6 Months"
-        case lastYear = "Last Year"
-        case custom = "Custom Date Range"
-        case allTime = "All Time"
+        case lastWeek = "Son Hafta"
+        case lastMonth = "Son Ay"
+        case last3Months = "Son 3 Ay"
+        case last6Months = "Son 6 Ay"
+        case lastYear = "Son Yıl"
+        case custom = "Özel Tarih Aralığı"
+        case allTime = "Tüm Zamanlar"
         
         var id: String { self.rawValue }
+    }
+    
+    enum TransitionStyle: String, CaseIterable, Identifiable {
+        case crossFade = "Geçiş Efekti"
+        case slide = "Kaydırma Efekti"
+        case zoom = "Zoom Efekti"
+        case none = "Efekt Yok"
+        
+        var id: String { self.rawValue }
+    }
+    
+    enum VideoSpeed: String, CaseIterable, Identifiable {
+        case slow = "Yavaş"
+        case normal = "Normal"
+        case fast = "Hızlı"
+        case veryFast = "Çok Hızlı"
+        
+        var id: String { self.rawValue }
+        
+        var durationMultiplier: Double {
+            switch self {
+            case .slow: return 2.0
+            case .normal: return 1.0
+            case .fast: return 0.5
+            case .veryFast: return 0.25
+            }
+        }
     }
     
     var filteredPhotos: [CapturedImage] {
@@ -61,19 +93,36 @@ struct VideoCreationView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
+            ZStack {
+                // Background
+                Color(.systemGroupedBackground)
+                    .edgesIgnoringSafeArea(.all)
+                
                 if photoManager.capturedImages.isEmpty {
                     emptyStateView
                 } else {
-                    videoCreationContent
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            headerView
+                            
+                            dateRangeSection
+                            
+                            photoPreviewSection
+                            
+                            videoOptionsSection
+                            
+                            createVideoButtonSection
+                        }
+                        .padding(.bottom, 30)
+                    }
                 }
             }
-            .navigationTitle("Create Video")
+            .navigationTitle("Dönüşüm Videosu")
             .alert(isPresented: $showingError) {
                 Alert(
-                    title: Text("Error"),
-                    message: Text(errorMessage ?? "An unknown error occurred"),
-                    dismissButton: .default(Text("OK"))
+                    title: Text("Hata"),
+                    message: Text(errorMessage ?? "Bilinmeyen bir hata oluştu"),
+                    dismissButton: .default(Text("Tamam"))
                 )
             }
             .sheet(isPresented: $showingDatePicker) {
@@ -92,11 +141,11 @@ struct VideoCreationView: View {
                 .foregroundColor(.gray)
                 .padding(.top, 100)
             
-            Text("Photos are required to create a video")
+            Text("Video oluşturmak için fotoğraf gerekli")
                 .font(.title2)
                 .foregroundColor(.gray)
             
-            Text("You need to take photos first to see your transformation")
+            Text("Dönüşümünüzü görmek için önce fotoğraf çekmelisiniz")
                 .font(.body)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
@@ -105,7 +154,7 @@ struct VideoCreationView: View {
             Button(action: {
                 // Switch to camera tab
             }) {
-                Label("Take Photo", systemImage: "camera")
+                Label("Fotoğraf Çek", systemImage: "camera")
                     .padding()
                     .background(Color.blue)
                     .foregroundColor(.white)
@@ -115,112 +164,310 @@ struct VideoCreationView: View {
         }
     }
     
-    var videoCreationContent: some View {
-        VStack(spacing: 20) {
-            // Date range selector
-            VStack(alignment: .leading) {
-                Text("Select Date Range")
-                    .font(.headline)
-                    .padding(.horizontal)
-                
-                Picker("Date Range", selection: $selectedDateRange) {
-                    ForEach(DateRangeOption.allCases) { option in
-                        Text(option.rawValue).tag(option)
-                    }
-                }
-                .pickerStyle(MenuPickerStyle())
+    var headerView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "sparkles.rectangle.stack.fill")
+                .font(.system(size: 50))
+                .foregroundColor(.blue)
+                .padding()
+            
+            Text("Kişisel Dönüşüm Videonu Oluştur")
+                .font(.title2)
+                .fontWeight(.bold)
+                .multilineTextAlignment(.center)
+            
+            Text("Fotoğraflarınızdan etkileyici bir zaman akışı videosu oluşturun")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
                 .padding(.horizontal)
-                
-                if selectedDateRange == .custom {
-                    Button("Select Date Range") {
-                        showingDatePicker = true
-                    }
-                    .padding(.horizontal)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        )
+        .padding(.horizontal)
+        .padding(.top, 10)
+    }
+    
+    var dateRangeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "calendar")
+                    .foregroundColor(.blue)
+                Text("Tarih Aralığı")
+                    .font(.headline)
+                Spacer()
+            }
+            
+            Picker("Tarih Aralığı", selection: $selectedDateRange) {
+                ForEach(DateRangeOption.allCases) { option in
+                    Text(option.rawValue).tag(option)
                 }
-                
-                Text("\(filteredPhotos.count) photos selected")
+            }
+            .pickerStyle(MenuPickerStyle())
+            .padding(8)
+            .background(Color(.systemBackground))
+            .cornerRadius(8)
+            
+            if selectedDateRange == .custom {
+                Button(action: {
+                    showingDatePicker = true
+                }) {
+                    HStack {
+                        Text("Tarih Aralığı Seç")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14))
+                            .foregroundColor(.gray)
+                    }
+                    .padding(12)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
+                }
+            }
+            
+            HStack {
+                Text("\(filteredPhotos.count) fotoğraf seçildi")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
-                    .padding(.horizontal)
+                
+                Spacer()
+                
+                if !filteredPhotos.isEmpty {
+                    Text("\(formatDate(filteredPhotos.first!.date)) - \(formatDate(filteredPhotos.last!.date))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
-            .padding(.vertical)
-            .background(Color(.systemGroupedBackground))
-            .cornerRadius(10)
-            .padding(.horizontal)
+            .padding(.top, 4)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        )
+        .padding(.horizontal)
+    }
+    
+    var photoPreviewSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .foregroundColor(.blue)
+                Text("Seçilen Fotoğraflar")
+                    .font(.headline)
+                Spacer()
+            }
             
-            // Preview of selected photos
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(filteredPhotos.prefix(10)) { photo in
-                        AsyncImage(url: photo.url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Color.gray
+            if filteredPhotos.isEmpty {
+                Text("Bu tarih aralığında fotoğraf bulunamadı")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: .infinity)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(filteredPhotos.prefix(15)) { photo in
+                            VStack {
+                                AsyncImage(url: photo.url) { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.3))
+                                }
+                                .frame(width: 100, height: 150)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white, lineWidth: 2)
+                                )
+                                
+                                Text(formatShortDate(photo.date))
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
                         }
-                        .frame(width: 80, height: 120)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.white, lineWidth: 2)
-                        )
+                        
+                        if filteredPhotos.count > 15 {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 100, height: 150)
+                                
+                                VStack {
+                                    Text("+\(filteredPhotos.count - 15)")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                    
+                                    Text("Daha Fazla\nFotoğraf")
+                                        .font(.caption)
+                                        .multilineTextAlignment(.center)
+                                        .foregroundColor(.white)
+                                }
+                            }
+                        }
                     }
+                    .padding(.vertical, 10)
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        )
+        .padding(.horizontal)
+    }
+    
+    var videoOptionsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "gear")
+                    .foregroundColor(.blue)
+                Text("Video Ayarları")
+                    .font(.headline)
+                Spacer()
+            }
+            
+            TextField("Video Başlığı (Opsiyonel)", text: $videoTitle)
+                .padding(12)
+                .background(Color(.systemGroupedBackground))
+                .cornerRadius(8)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Geçiş Efekti")
+                    .font(.subheadline)
+                
+                HStack {
+                    Toggle("", isOn: $enableTransition)
+                        .labelsHidden()
                     
-                    if filteredPhotos.count > 10 {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.gray.opacity(0.3))
-                                .frame(width: 80, height: 120)
-                            
-                            Text("+\(filteredPhotos.count - 10)")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .fontWeight(.bold)
+                    if enableTransition {
+                        Picker("Geçiş Stili", selection: $transitionStyle) {
+                            ForEach(TransitionStyle.allCases) { style in
+                                Text(style.rawValue).tag(style)
+                            }
                         }
+                        .pickerStyle(MenuPickerStyle())
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        Text("Devre Dışı")
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .padding(.horizontal)
+                .padding(8)
+                .background(Color(.systemGroupedBackground))
+                .cornerRadius(8)
             }
             
-            Spacer()
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Video Hızı")
+                    .font(.subheadline)
+                
+                Picker("Video Hızı", selection: $videoSpeed) {
+                    ForEach(VideoSpeed.allCases) { speed in
+                        Text(speed.rawValue).tag(speed)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+            }
             
-            // Create video button
+            HStack {
+                Toggle("Tarih Etiketi Göster", isOn: $includeDate)
+                    .font(.subheadline)
+            }
+            .padding(8)
+            .background(Color(.systemGroupedBackground))
+            .cornerRadius(8)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        )
+        .padding(.horizontal)
+    }
+    
+    var createVideoButtonSection: some View {
+        VStack(spacing: 16) {
+            // Create video button with gradient
             Button(action: createVideo) {
                 if isCreatingVideo {
-                    HStack {
+                    HStack(spacing: 15) {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        Text("Processing...")
+                        Text("Video İşleniyor...")
+                            .font(.headline)
                             .foregroundColor(.white)
                     }
-                    .frame(width: 250, height: 50)
-                    .background(Color.blue)
-                    .cornerRadius(10)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 55)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.blue.opacity(0.7), Color.blue]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(15)
                 } else {
-                    Text("Dönüşüm Videosu Oluştur")
-                        .foregroundColor(.white)
-                        .frame(width: 250, height: 50)
-                        .background(Color.blue)
-                        .cornerRadius(10)
+                    HStack(spacing: 15) {
+                        Image(systemName: "sparkles.square.filled.on.square")
+                            .font(.title3)
+                        Text("Dönüşüm Videosu Oluştur")
+                            .font(.headline)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 55)
+                    .foregroundColor(.white)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.blue, Color.purple]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(15)
                 }
             }
             .disabled(isCreatingVideo || filteredPhotos.isEmpty)
+            .shadow(color: Color.blue.opacity(0.3), radius: 5, x: 0, y: 3)
             
             // Show video button if available
             if let _ = generatedVideoURL, !isCreatingVideo {
                 Button(action: {
                     showingVideo = true
                 }) {
-                    HStack {
+                    HStack(spacing: 15) {
                         Image(systemName: "play.circle.fill")
-                        Text("Videoyu Göster")
+                            .font(.title3)
+                        Text("Videoyu Oynat")
+                            .font(.headline)
                     }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 55)
                     .foregroundColor(.white)
-                    .frame(width: 250, height: 50)
-                    .background(Color.green)
-                    .cornerRadius(10)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.green, Color.green.opacity(0.7)]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(15)
                 }
+                .shadow(color: Color.green.opacity(0.3), radius: 5, x: 0, y: 3)
             }
             
             // Save video button if available
@@ -228,27 +475,51 @@ struct VideoCreationView: View {
                 Button(action: {
                     saveVideoToGallery(url: videoURL)
                 }) {
-                    HStack {
+                    HStack(spacing: 15) {
                         Image(systemName: "square.and.arrow.down.fill")
-                        Text("Videoyu Kaydet")
+                            .font(.title3)
+                        Text("Galeriye Kaydet")
+                            .font(.headline)
                     }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 55)
                     .foregroundColor(.white)
-                    .frame(width: 250, height: 50)
-                    .background(Color.purple)
-                    .cornerRadius(10)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.purple, Color.purple.opacity(0.7)]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(15)
                 }
+                .shadow(color: Color.purple.opacity(0.3), radius: 5, x: 0, y: 3)
             }
-            
-            Spacer()
         }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        )
+        .padding(.horizontal)
     }
     
     var datePickerView: some View {
         NavigationView {
             VStack {
                 Form {
-                    DatePicker("Başlangıç Tarihi", selection: $startDate, displayedComponents: .date)
-                    DatePicker("Bitiş Tarihi", selection: $endDate, displayedComponents: .date)
+                    Section(header: Text("Başlangıç Tarihi")) {
+                        DatePicker("", selection: $startDate, displayedComponents: .date)
+                            .datePickerStyle(GraphicalDatePickerStyle())
+                            .labelsHidden()
+                    }
+                    
+                    Section(header: Text("Bitiş Tarihi")) {
+                        DatePicker("", selection: $endDate, displayedComponents: .date)
+                            .datePickerStyle(GraphicalDatePickerStyle())
+                            .labelsHidden()
+                    }
                 }
             }
             .navigationTitle("Tarih Aralığı Seçin")
@@ -256,9 +527,10 @@ struct VideoCreationView: View {
                 leading: Button("İptal") {
                     showingDatePicker = false
                 },
-                trailing: Button("Tamam") {
+                trailing: Button("Uygula") {
                     showingDatePicker = false
                 }
+                .fontWeight(.bold)
             )
         }
     }
@@ -279,7 +551,10 @@ struct VideoCreationView: View {
                                 .font(.system(size: 30))
                                 .foregroundColor(.white)
                                 .padding()
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
                         }
+                        .padding()
                     }
                     Spacer()
                 }
@@ -297,6 +572,8 @@ struct VideoCreationView: View {
         
         isCreatingVideo = true
         
+        // Here you would update the createVideo method to pass the new parameters
+        // For demonstration, we'll simply call the existing method
         photoManager.createVideo(from: filteredPhotos) { url, error in
             DispatchQueue.main.async {
                 isCreatingVideo = false
@@ -326,5 +603,17 @@ struct VideoCreationView: View {
                 }
             }
         }
+    }
+    
+    func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd.MM.yyyy"
+        return formatter.string(from: date)
+    }
+    
+    func formatShortDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd.MM.yy"
+        return formatter.string(from: date)
     }
 }

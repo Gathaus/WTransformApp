@@ -24,21 +24,6 @@ struct CameraView: View {
                 
                 // Controls overlay
                 VStack {
-                    // Add a status indicator at the top
-                    HStack {
-                        Circle()
-                            .fill(cameraService.isSessionRunning ? Color.green : Color.red)
-                            .frame(width: 10, height: 10)
-                        
-                        Text(cameraService.isSessionRunning ? "Camera active" : "Camera inactive")
-                            .font(.caption)
-                            .foregroundColor(.white)
-                        
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 40)
-                    
                     Spacer()
                     
                     HStack {
