@@ -9,9 +9,16 @@ import SwiftUI
 
 @main
 struct WTransformApp: App {
+    // Initialize PhotoService at app launch
+    @StateObject private var photoService = PhotoService()
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onAppear {
+                    // Request permissions when app launches
+                    photoService.requestPermissions()
+                }
         }
     }
 }

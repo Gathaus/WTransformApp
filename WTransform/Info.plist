@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict/>
+    </array>
+    
+    <!-- Camera permission for taking daily photos -->
+    <key>NSCameraUsageDescription</key>
+    <string>Bu uygulama günlük dönüşüm fotoğraflarını çekmek için kamera erişimine ihtiyaç duyar</string>
+    
+    <!-- Photo Library access permission -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Bu uygulama dönüşüm videolarını kaydetmek için fotoğraf kitaplığınıza erişim gerektirir</string>
+    
+    <!-- Permission to save videos to Photo Library -->
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>Bu uygulama dönüşüm videolarını fotoğraf kitaplığınıza kaydetmek için izne ihtiyaç duyar</string>
+    
+    <!-- Microphone permission -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Bu uygulama video oluştururken ses kaydı yapabilir</string>
+    
+    <!-- Required for media handling -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+        <string>processing</string>
+    </array>
+    
+    <!-- For improved appearance on newer devices -->
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <true/>
+    
+    <!-- Support portrait orientation primarily -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    
+    <!-- iPad orientations -->
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    
+    <!-- Required for proper device compatibility -->
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>armv7</string>
+        <string>video-camera</string>
+    </array>
+    
+    <!-- Privacy settings for iOS 14+ -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+</dict>
+</plist>
