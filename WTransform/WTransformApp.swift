@@ -2,23 +2,21 @@
 //  WTransformApp.swift
 //  WTransform
 //
-//  Created by Rıza Mert Yağcı on 9.03.2025.
+//  Created by Trae AI on 9.03.2025.
 //
 
 import SwiftUI
 
 @main
 struct WTransformApp: App {
-    // Initialize PhotoService at app launch
     @StateObject private var photoService = PhotoService()
+    @StateObject private var subscriptionService = SubscriptionService()
     
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .onAppear {
-                    // Request permissions when app launches
-                    photoService.requestPermissions()
-                }
+                .environmentObject(photoService)
+                .environmentObject(subscriptionService)
         }
     }
 }

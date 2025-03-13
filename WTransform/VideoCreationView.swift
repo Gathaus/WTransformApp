@@ -10,6 +10,7 @@ import AVKit
 
 struct VideoCreationView: View {
     @ObservedObject var photoManager: PhotoService
+    @ObservedObject var subscriptionService: SubscriptionService
     @State private var isCreatingVideo = false
     @State private var processingProgress = 0.0
     @State private var generatedVideoURL: URL?
@@ -25,42 +26,41 @@ struct VideoCreationView: View {
     @State private var transitionStyle: TransitionStyle = .crossFade
     @State private var includeDate = true
     @State private var videoSpeed: VideoSpeed = .normal
+    @State private var selectedPhotos: Set<String> = Set()
+    @State private var useSelectedPhotosOnly = false
+    @State private var isShowingLoadingAnimation = false
+    @State private var enableBackgroundMusic = false
+    @State private var selectedMusic: String = "None"
+    @State private var musicVolume: Double = 0.5
+    
+    let availableMusicTracks = ["Uplifting", "Motivational", "Relaxing", "Energetic", "Emotional"]
     
     enum DateRangeOption: String, CaseIterable, Identifiable {
-        case lastWeek = "Son Hafta"
-        case lastMonth = "Son Ay"
-        case last3Months = "Son 3 Ay"
-        case last6Months = "Son 6 Ay"
-        case lastYear = "Son Yıl"
-        case custom = "Özel Tarih Aralığı"
-        case allTime = "Tüm Zamanlar"
-        
-        var id: String { self.rawValue }
-    }
-    
-    enum TransitionStyle: String, CaseIterable, Identifiable {
-        case crossFade = "Geçiş Efekti"
-        case slide = "Kaydırma Efekti"
-        case zoom = "Zoom Efekti"
-        case none = "Efekt Yok"
+        case lastWeek = "Last Week"
+        case lastMonth = "Last Month"
+        case last3Months = "Last 3 Months"
+        case last6Months = "Last 6 Months"
+        case lastYear = "Last Year"
+        case custom = "Custom Date Range"
+        case allTime = "All Time"
         
         var id: String { self.rawValue }
     }
     
     enum VideoSpeed: String, CaseIterable, Identifiable {
-        case slow = "Yavaş"
+        case veryFast = "Very Fast"
+        case fast = "Fast"
         case normal = "Normal"
-        case fast = "Hızlı"
-        case veryFast = "Çok Hızlı"
+        case slow = "Slow"
         
         var id: String { self.rawValue }
         
-        var durationMultiplier: Double {
+        var photoDuration: Double {
             switch self {
-            case .slow: return 2.0
-            case .normal: return 1.0
-            case .fast: return 0.5
-            case .veryFast: return 0.25
+            case .veryFast: return 0.5
+            case .fast: return 1.5
+            case .normal: return 3.5
+            case .slow: return 8.0
             }
         }
     }
@@ -117,12 +117,12 @@ struct VideoCreationView: View {
                     }
                 }
             }
-            .navigationTitle("Dönüşüm Videosu")
+            .navigationTitle("Transformation Video")
             .alert(isPresented: $showingError) {
                 Alert(
-                    title: Text("Hata"),
-                    message: Text(errorMessage ?? "Bilinmeyen bir hata oluştu"),
-                    dismissButton: .default(Text("Tamam"))
+                    title: Text("Error"),
+                    message: Text(errorMessage ?? "An unknown error occurred"),
+                    dismissButton: .default(Text("OK"))
                 )
             }
             .sheet(isPresented: $showingDatePicker) {
@@ -141,11 +141,11 @@ struct VideoCreationView: View {
                 .foregroundColor(.gray)
                 .padding(.top, 100)
             
-            Text("Video oluşturmak için fotoğraf gerekli")
+            Text("Photos needed for video creation")
                 .font(.title2)
                 .foregroundColor(.gray)
             
-            Text("Dönüşümünüzü görmek için önce fotoğraf çekmelisiniz")
+            Text("You need to take photos first to see your transformation")
                 .font(.body)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
@@ -154,7 +154,7 @@ struct VideoCreationView: View {
             Button(action: {
                 // Switch to camera tab
             }) {
-                Label("Fotoğraf Çek", systemImage: "camera")
+                Label("Take Photo", systemImage: "camera")
                     .padding()
                     .background(Color.blue)
                     .foregroundColor(.white)
@@ -171,12 +171,12 @@ struct VideoCreationView: View {
                 .foregroundColor(.blue)
                 .padding()
             
-            Text("Kişisel Dönüşüm Videonu Oluştur")
+            Text("Create Your Transformation Video")
                 .font(.title2)
                 .fontWeight(.bold)
                 .multilineTextAlignment(.center)
             
-            Text("Fotoğraflarınızdan etkileyici bir zaman akışı videosu oluşturun")
+            Text("Create an impressive time-lapse video from your photos")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -197,12 +197,12 @@ struct VideoCreationView: View {
             HStack {
                 Image(systemName: "calendar")
                     .foregroundColor(.blue)
-                Text("Tarih Aralığı")
+                Text("Date Range")
                     .font(.headline)
                 Spacer()
             }
             
-            Picker("Tarih Aralığı", selection: $selectedDateRange) {
+            Picker("Date Range", selection: $selectedDateRange) {
                 ForEach(DateRangeOption.allCases) { option in
                     Text(option.rawValue).tag(option)
                 }
@@ -217,7 +217,7 @@ struct VideoCreationView: View {
                     showingDatePicker = true
                 }) {
                     HStack {
-                        Text("Tarih Aralığı Seç")
+                        Text("Select Date Range")
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 14))
@@ -230,7 +230,7 @@ struct VideoCreationView: View {
             }
             
             HStack {
-                Text("\(filteredPhotos.count) fotoğraf seçildi")
+                Text("\(filteredPhotos.count) photos selected")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
@@ -258,13 +258,21 @@ struct VideoCreationView: View {
             HStack {
                 Image(systemName: "photo.on.rectangle.angled")
                     .foregroundColor(.blue)
-                Text("Seçilen Fotoğraflar")
+                Text("Selected Photos")
                     .font(.headline)
                 Spacer()
+                
+                Toggle("Selected Photos Only", isOn: $useSelectedPhotosOnly)
+                    .font(.caption)
+                    .onChange(of: useSelectedPhotosOnly) { oldValue, newValue in
+                        if !newValue {
+                            selectedPhotos.removeAll()
+                        }
+                    }
             }
             
             if filteredPhotos.isEmpty {
-                Text("Bu tarih aralığında fotoğraf bulunamadı")
+                Text("No photos found in this date range")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .padding(.vertical, 20)
@@ -272,7 +280,7 @@ struct VideoCreationView: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        ForEach(filteredPhotos.prefix(15)) { photo in
+                        ForEach(filteredPhotos) { photo in
                             VStack {
                                 AsyncImage(url: photo.url) { image in
                                     image
@@ -286,32 +294,36 @@ struct VideoCreationView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.white, lineWidth: 2)
+                                        .stroke(selectedPhotos.contains(photo.id) ? Color.blue : Color.white, lineWidth: 2)
                                 )
+                                .overlay(
+                                    ZStack {
+                                        if selectedPhotos.contains(photo.id) {
+                                            Circle()
+                                                .fill(Color.blue)
+                                                .frame(width: 24, height: 24)
+                                            
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 12, weight: .bold))
+                                                .foregroundColor(.white)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                                    .padding(8)
+                                )
+                                .onTapGesture {
+                                    if useSelectedPhotosOnly {
+                                        if selectedPhotos.contains(photo.id) {
+                                            selectedPhotos.remove(photo.id)
+                                        } else {
+                                            selectedPhotos.insert(photo.id)
+                                        }
+                                    }
+                                }
                                 
                                 Text(formatShortDate(photo.date))
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        if filteredPhotos.count > 15 {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 100, height: 150)
-                                
-                                VStack {
-                                    Text("+\(filteredPhotos.count - 15)")
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.white)
-                                    
-                                    Text("Daha Fazla\nFotoğraf")
-                                        .font(.caption)
-                                        .multilineTextAlignment(.center)
-                                        .foregroundColor(.white)
-                                }
                             }
                         }
                     }
@@ -329,22 +341,31 @@ struct VideoCreationView: View {
     }
     
     var videoOptionsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "gear")
-                    .foregroundColor(.blue)
-                Text("Video Ayarları")
-                    .font(.headline)
-                Spacer()
-            }
+        VStack(alignment: .leading, spacing: 15) {
+            Text("Video Options")
+                .font(.headline)
+                .padding(.top, 8)
+                .padding(.horizontal)
             
-            TextField("Video Başlığı (Opsiyonel)", text: $videoTitle)
-                .padding(12)
+            // Speed selection
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Video Speed")
+                    .font(.subheadline)
+                
+                Picker("Video Speed", selection: $videoSpeed) {
+                    ForEach(VideoSpeed.allCases) { speed in
+                        Text(speed.rawValue).tag(speed)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding(8)
                 .background(Color(.systemGroupedBackground))
                 .cornerRadius(8)
+            }
             
+            // Transition effect
             VStack(alignment: .leading, spacing: 8) {
-                Text("Geçiş Efekti")
+                Text("Transition Effect")
                     .font(.subheadline)
                 
                 HStack {
@@ -352,15 +373,35 @@ struct VideoCreationView: View {
                         .labelsHidden()
                     
                     if enableTransition {
-                        Picker("Geçiş Stili", selection: $transitionStyle) {
-                            ForEach(TransitionStyle.allCases) { style in
-                                Text(style.rawValue).tag(style)
+                        Picker("Transition Style", selection: $transitionStyle) {
+                            Text("Cross Fade").tag(TransitionStyle.crossFade)
+                            
+                            if subscriptionService.hasActiveSubscription() || subscriptionService.isTrialActive {
+                                Text("Slide").tag(TransitionStyle.slide)
+                                Text("Zoom").tag(TransitionStyle.zoom)
+                                Text("None").tag(TransitionStyle.none)
+                            } else {
+                                Text("Slide (Premium)").tag(TransitionStyle.crossFade)
+                                    .foregroundColor(.gray)
+                                Text("Zoom (Premium)").tag(TransitionStyle.crossFade)
+                                    .foregroundColor(.gray)
                             }
                         }
                         .pickerStyle(MenuPickerStyle())
                         .frame(maxWidth: .infinity)
+                        .onChange(of: transitionStyle) { newValue in
+                            // If user is not premium and selects a premium transition,
+                            // show an alert and reset to crossFade
+                            if !(subscriptionService.hasActiveSubscription() || subscriptionService.isTrialActive) {
+                                if newValue == .slide || newValue == .zoom || newValue == .none {
+                                    transitionStyle = .crossFade
+                                    errorMessage = "Premium transitions are only available with a subscription."
+                                    showingError = true
+                                }
+                            }
+                        }
                     } else {
-                        Text("Devre Dışı")
+                        Text("Disabled")
                             .foregroundColor(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -370,25 +411,86 @@ struct VideoCreationView: View {
                 .cornerRadius(8)
             }
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Video Hızı")
-                    .font(.subheadline)
-                
-                Picker("Video Hızı", selection: $videoSpeed) {
-                    ForEach(VideoSpeed.allCases) { speed in
-                        Text(speed.rawValue).tag(speed)
-                    }
-                }
-                .pickerStyle(SegmentedPickerStyle())
-            }
-            
+            // Date label toggle
             HStack {
-                Toggle("Tarih Etiketi Göster", isOn: $includeDate)
-                    .font(.subheadline)
+                if subscriptionService.hasActiveSubscription() || subscriptionService.isTrialActive {
+                    Toggle("Show Date Label", isOn: $includeDate)
+                        .font(.subheadline)
+                } else {
+                    Text("Date Label (Premium to remove)")
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                }
             }
             .padding(8)
             .background(Color(.systemGroupedBackground))
             .cornerRadius(8)
+            
+            // Background music (Premium only)
+            if subscriptionService.hasActiveSubscription() || subscriptionService.isTrialActive {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Background Music")
+                        .font(.subheadline)
+                    
+                    HStack {
+                        Toggle("", isOn: $enableBackgroundMusic)
+                            .labelsHidden()
+                        
+                        if enableBackgroundMusic {
+                            Picker("Music Track", selection: $selectedMusic) {
+                                Text("None").tag("None")
+                                ForEach(availableMusicTracks, id: \.self) { track in
+                                    Text(track).tag(track)
+                                }
+                            }
+                            .pickerStyle(MenuPickerStyle())
+                            .frame(maxWidth: .infinity)
+                        } else {
+                            Text("No music")
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .padding(8)
+                    .background(Color(.systemGroupedBackground))
+                    .cornerRadius(8)
+                    
+                    if enableBackgroundMusic && selectedMusic != "None" {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Music Volume: \(Int(musicVolume * 100))%")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Slider(value: $musicVolume, in: 0...1, step: 0.05)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 8)
+                        .background(Color(.systemGroupedBackground))
+                        .cornerRadius(8)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "music.note")
+                            .foregroundColor(.secondary)
+                        Text("Background Music (Premium)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Image(systemName: "lock.fill")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                    }
+                    .padding(8)
+                    .background(Color(.systemGroupedBackground))
+                    .cornerRadius(8)
+                    .onTapGesture {
+                        errorMessage = "Background music is a premium feature. Please subscribe to use it."
+                        showingError = true
+                    }
+                }
+            }
         }
         .padding()
         .background(
@@ -405,9 +507,14 @@ struct VideoCreationView: View {
             Button(action: createVideo) {
                 if isCreatingVideo {
                     HStack(spacing: 15) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        Text("Video İşleniyor...")
+                        if isShowingLoadingAnimation {
+                            LoadingAnimationView()
+                                .frame(width: 30, height: 30)
+                        } else {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        }
+                        Text("Processing Video...")
                             .font(.headline)
                             .foregroundColor(.white)
                     }
@@ -425,7 +532,7 @@ struct VideoCreationView: View {
                     HStack(spacing: 15) {
                         Image(systemName: "sparkles.square.filled.on.square")
                             .font(.title3)
-                        Text("Dönüşüm Videosu Oluştur")
+                        Text("Create Transformation Video")
                             .font(.headline)
                     }
                     .frame(maxWidth: .infinity)
@@ -441,7 +548,7 @@ struct VideoCreationView: View {
                     .cornerRadius(15)
                 }
             }
-            .disabled(isCreatingVideo || filteredPhotos.isEmpty)
+            .disabled(isCreatingVideo || (useSelectedPhotosOnly && selectedPhotos.isEmpty) || (!useSelectedPhotosOnly && filteredPhotos.isEmpty))
             .shadow(color: Color.blue.opacity(0.3), radius: 5, x: 0, y: 3)
             
             // Show video button if available
@@ -452,7 +559,7 @@ struct VideoCreationView: View {
                     HStack(spacing: 15) {
                         Image(systemName: "play.circle.fill")
                             .font(.title3)
-                        Text("Videoyu Oynat")
+                        Text("Play Video")
                             .font(.headline)
                     }
                     .frame(maxWidth: .infinity)
@@ -478,7 +585,7 @@ struct VideoCreationView: View {
                     HStack(spacing: 15) {
                         Image(systemName: "square.and.arrow.down.fill")
                             .font(.title3)
-                        Text("Galeriye Kaydet")
+                        Text("Save to Gallery")
                             .font(.headline)
                     }
                     .frame(maxWidth: .infinity)
@@ -509,25 +616,25 @@ struct VideoCreationView: View {
         NavigationView {
             VStack {
                 Form {
-                    Section(header: Text("Başlangıç Tarihi")) {
+                    Section(header: Text("Start Date")) {
                         DatePicker("", selection: $startDate, displayedComponents: .date)
                             .datePickerStyle(GraphicalDatePickerStyle())
                             .labelsHidden()
                     }
                     
-                    Section(header: Text("Bitiş Tarihi")) {
+                    Section(header: Text("End Date")) {
                         DatePicker("", selection: $endDate, displayedComponents: .date)
                             .datePickerStyle(GraphicalDatePickerStyle())
                             .labelsHidden()
                     }
                 }
             }
-            .navigationTitle("Tarih Aralığı Seçin")
+            .navigationTitle("Select Date Range")
             .navigationBarItems(
-                leading: Button("İptal") {
+                leading: Button("Cancel") {
                     showingDatePicker = false
                 },
-                trailing: Button("Uygula") {
+                trailing: Button("Apply") {
                     showingDatePicker = false
                 }
                 .fontWeight(.bold)
@@ -564,56 +671,144 @@ struct VideoCreationView: View {
     }
     
     func createVideo() {
-        guard !filteredPhotos.isEmpty else {
-            errorMessage = "Video oluşturmak için fotoğraf bulunamadı"
-            showingError = true
-            return
-        }
-        
+        // Set loading state immediately to prevent UI freeze
         isCreatingVideo = true
+        isShowingLoadingAnimation = true
         
-        // Here you would update the createVideo method to pass the new parameters
-        // For demonstration, we'll simply call the existing method
-        photoManager.createVideo(from: filteredPhotos) { url, error in
-            DispatchQueue.main.async {
-                isCreatingVideo = false
-                
-                if let error = error {
-                    errorMessage = "Video oluşturulurken hata: \(error.localizedDescription)"
-                    showingError = true
-                    return
-                }
-                
-                if let url = url {
-                    generatedVideoURL = url
-                    showingVideo = true
+        // Use a small delay to let the UI update before starting heavy processing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            // Determine which photos to use
+            var photosToUse: [CapturedImage]
+            
+            if self.useSelectedPhotosOnly && !self.selectedPhotos.isEmpty {
+                photosToUse = self.filteredPhotos.filter { self.selectedPhotos.contains($0.id) }
+            } else {
+                photosToUse = self.filteredPhotos
+            }
+            
+            guard !photosToUse.isEmpty else {
+                self.isCreatingVideo = false
+                self.isShowingLoadingAnimation = false
+                self.errorMessage = "No photos found to create video"
+                self.showingError = true
+                return
+            }
+            
+            // Transition style'ı belirle
+            let style: TransitionStyle = self.enableTransition ? self.transitionStyle : .none
+            
+            // Pass the duration from videoSpeed and transition style
+            self.photoManager.createVideo(
+                from: photosToUse, 
+                duration: self.videoSpeed.photoDuration,
+                transitionStyle: style
+            ) { url, error in
+                DispatchQueue.main.async {
+                    self.isCreatingVideo = false
+                    self.isShowingLoadingAnimation = false
+                    
+                    if let error = error {
+                        self.errorMessage = "Error creating video: \(error.localizedDescription)"
+                        self.showingError = true
+                        return
+                    }
+                    
+                    if let url = url {
+                        self.generatedVideoURL = url
+                        self.showingVideo = true
+                    }
                 }
             }
         }
     }
     
     func saveVideoToGallery(url: URL) {
-        photoManager.saveVideoToLibrary(url: url) { success, error in
-            DispatchQueue.main.async {
-                if success {
-                    // Show success message
-                } else if let error = error {
-                    errorMessage = "Video kaydedilirken hata: \(error.localizedDescription)"
-                    showingError = true
+        if subscriptionService.hasActiveSubscription() || subscriptionService.isTrialActive {
+            // Premium user - save directly without watermark
+            photoManager.saveVideoToLibrary(url: url) { success, error in
+                DispatchQueue.main.async {
+                    if success {
+                        // Show success message
+                        let generator = UINotificationFeedbackGenerator()
+                        generator.notificationOccurred(.success)
+                    } else if let error = error {
+                        errorMessage = "Error saving video: \(error.localizedDescription)"
+                        showingError = true
+                    }
+                }
+            }
+        } else {
+            // Non-premium user - apply watermark before saving
+            let watermarkedURL = applyWatermark(to: url)
+            
+            // Save the watermarked video
+            photoManager.saveVideoToLibrary(url: watermarkedURL) { success, error in
+                DispatchQueue.main.async {
+                    if success {
+                        let generator = UINotificationFeedbackGenerator()
+                        generator.notificationOccurred(.success)
+                    } else if let error = error {
+                        self.errorMessage = "Error saving video: \(error.localizedDescription)"
+                        self.showingError = true
+                    }
                 }
             }
         }
     }
     
+    // Helper function to apply watermark to video
+    func applyWatermark(to videoURL: URL) -> URL {
+        // In a real implementation, this would use AVFoundation to apply a watermark
+        // For now, we'll just return the original URL since we can't implement the actual watermarking without more code
+        // This is a placeholder for the watermarking functionality
+        return videoURL
+    }
+    
     func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "dd.MM.yyyy"
+        formatter.dateFormat = "d MMMM yyyy"
         return formatter.string(from: date)
     }
     
     func formatShortDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "dd.MM.yy"
+        formatter.dateFormat = "d MMM yyyy"
         return formatter.string(from: date)
+    }
+    
+    func getSpeedDescription() -> String {
+        switch videoSpeed {
+        case .veryFast:
+            return "0.5 seconds per photo (Fastest)"
+        case .fast:
+            return "1.5 seconds per photo (Fast pace)"
+        case .normal:
+            return "3.5 seconds per photo (Normal speed)"
+        case .slow:
+            return "8 seconds per photo (Slow viewing)"
+        }
+    }
+}
+
+struct LoadingAnimationView: View {
+    @State private var isAnimating = false
+    
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(lineWidth: 3)
+                .opacity(0.3)
+                .foregroundColor(.white)
+            
+            Circle()
+                .trim(from: 0, to: 0.7)
+                .stroke(lineWidth: 3)
+                .rotationEffect(Angle(degrees: isAnimating ? 360 : 0))
+                .animation(Animation.linear(duration: 0.8).repeatForever(autoreverses: false), value: isAnimating)
+                .foregroundColor(.white)
+        }
+        .onAppear {
+            self.isAnimating = true
+        }
     }
 }

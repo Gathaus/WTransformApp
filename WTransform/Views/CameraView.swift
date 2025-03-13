@@ -7,6 +7,8 @@
 
 import SwiftUI
 import AVFoundation
+// Bu importu silebiliriz, aşağıdaki satırı ekleyeceğiz
+// import WTransform
 
 struct CameraView: View {
     @ObservedObject var photoManager: PhotoService

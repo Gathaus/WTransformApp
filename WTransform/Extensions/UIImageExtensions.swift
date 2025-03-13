@@ -66,7 +66,7 @@ extension UIImage {
         return buffer
     }
     
-    func blend(with image: UIImage, alpha: CGFloat) -> UIImage? {
+    func blend(with image: UIImage, alpha: CGFloat) -> UIImage {
         let size = CGSize(width: 1080, height: 1920)
         UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
         defer { UIGraphicsEndImageContext() }
@@ -74,6 +74,6 @@ extension UIImage {
         self.draw(in: CGRect(origin: .zero, size: size), blendMode: .normal, alpha: 1.0)
         image.draw(in: CGRect(origin: .zero, size: size), blendMode: .normal, alpha: alpha)
         
-        return UIGraphicsGetImageFromCurrentImageContext()
+        return UIGraphicsGetImageFromCurrentImageContext() ?? self
     }
 }

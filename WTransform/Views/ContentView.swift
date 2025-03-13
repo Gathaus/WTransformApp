@@ -10,7 +10,8 @@ import AVFoundation
 import Photos
 
 struct ContentView: View {
-    @StateObject private var photoService = PhotoService()
+    @EnvironmentObject var photoService: PhotoService
+    @EnvironmentObject var subscriptionService: SubscriptionService
     @State private var selectedTab = 0
     
     var body: some View {
@@ -21,19 +22,26 @@ struct ContentView: View {
                 }
                 .tag(0)
             
-            PhotoGalleryView(photoManager: photoService)
+            PhotoGalleryView(photoManager: photoService, subscriptionService: subscriptionService)
                 .tabItem {
-                    Label("Photos", systemImage: "photo.on.rectangle")
+                    Label("Gallery", systemImage: "photo.on.rectangle")
                 }
                 .tag(1)
             
-            VideoCreationView(photoManager: photoService)
+            VideoCreationView(photoManager: photoService, subscriptionService: subscriptionService)
                 .tabItem {
-                    Label("Create Video", systemImage: "play.rectangle")
+                    Label("Create Video", systemImage: "video")
                 }
                 .tag(2)
+                
+            SettingsView(subscriptionService: subscriptionService)
+                .tabItem {
+                    Label("Settings", systemImage: "gear")
+                }
+                .tag(3)
         }
         .onAppear {
+            // Request permissions when view appears
             photoService.requestPermissions()
             
             // Customize tab bar appearance to make inactive tabs more visible
@@ -64,4 +72,6 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(PhotoService())
+        .environmentObject(SubscriptionService())
 }
